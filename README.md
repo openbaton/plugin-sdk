@@ -53,11 +53,7 @@ public class StarterClass {
     public static void main(String[] args) {
         log.info("params are: pluginName registryIp registryPort\ndefault is openstack-plugin localhost 1099");
 
-        if (args.length > 1)
-            PluginStarter.run(OpenstackClient.class, args[0], args[1], Integer.parseInt(args[2]));
-        else
-            PluginStarter.run(OpenstackClient.class, "openstack-plugin", "localhost");
-    }
+        PluginStartup.startPluginRecursive("./path-to-folder", true, "broker-ip", "5672", 15, "admin", "openbaton", "15672");
 }
 ```
 
