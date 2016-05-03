@@ -32,7 +32,7 @@ repositories {
 }
 
 dependencies {
-    compile 'org.openbaton:plugin-sdk:0.6'
+    compile 'org.openbaton:plugin-sdk:2.0.0'
 }
 ```
 
@@ -64,7 +64,7 @@ public class StarterClass {
 Then, compile & run it
 
 #### Version
-0.6
+2.0.0
 
 ##### Installation
 
@@ -78,6 +78,14 @@ Want to contribute? Great! Get in contact with us. You can find us on twitter @[
 Information about OpenBaton can be found on our website. Follow us on Twitter @[openbaton].
 
 ### License
+
+Copyright (c) 2015 Fraunhofer FOKUS. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
 [nfvo-link]: https://github.com/openbaton/NFVO
 [generic-link]:https://github.com/openbaton/generic-vnfm
