@@ -5,7 +5,7 @@ OpenBaton is an open source project providing a reference implementation of the 
 
 #### How does this works? 
 
-An OpenBaton Plugin is a RMI Server that connects to the NFVO or any other rmiregistry with access to the OpenBaton catalogue as _codebase_. It offers an implementation of an interface that is used by NFVO. by default NFVO starts a rmiregistry at localhost:1099.
+An OpenBaton Plugin is a separate application that accepts requests from the NFVO to allocate and update resources on VIM. Plugin SDK provides an interface to develop the plugins to work with Openbaton NFVO or VNFM of your choice. SDK allows the communication through rabbitmq broker via AMQP messaging.
 
 In order to create a VIM plugin for OpenBaton system you need to add to your gradle build file:
 
