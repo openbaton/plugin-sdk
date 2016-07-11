@@ -22,222 +22,230 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-
 /**
  * Created by lto on 25/11/15.
  */
 public class PluginListener implements Runnable {
 
-    private static final String exchange = "plugin-exchange";
-    private String pluginId;
-    private Object pluginInstance;
-    private Logger log;
-    private QueueingConsumer consumer;
-    private Channel channel;
-    private Gson gson = new GsonBuilder().registerTypeHierarchyAdapter(byte[].class, new ByteArrayToBase64TypeAdapter()).setPrettyPrinting().create();
-    private boolean exit = false;
-    private String brokerIp;
-    private int brokerPort;
-    private String username;
-    private String password;
-    private Connection connection;
+  private static final String exchange = "plugin-exchange";
+  private String pluginId;
+  private Object pluginInstance;
+  private Logger log;
+  private QueueingConsumer consumer;
+  private Channel channel;
+  private Gson gson =
+      new GsonBuilder()
+          .registerTypeHierarchyAdapter(byte[].class, new ByteArrayToBase64TypeAdapter())
+          .setPrettyPrinting()
+          .create();
+  private boolean exit = false;
+  private String brokerIp;
+  private int brokerPort;
+  private String username;
+  private String password;
+  private Connection connection;
 
-    public String getPluginId() {
-        return pluginId;
+  public String getPluginId() {
+    return pluginId;
+  }
+
+  public void setPluginId(String pluginId) {
+    this.pluginId = pluginId;
+  }
+
+  public Object getPluginInstance() {
+    return pluginInstance;
+  }
+
+  public void setPluginInstance(Object pluginInstance) {
+    this.pluginInstance = pluginInstance;
+    log = LoggerFactory.getLogger(pluginInstance.getClass().getName());
+  }
+
+  public boolean isExit() {
+    return exit;
+  }
+
+  public void setExit(boolean exit) {
+    this.exit = exit;
+  }
+
+  private static class ByteArrayToBase64TypeAdapter
+      implements JsonSerializer<byte[]>, JsonDeserializer<byte[]> {
+    public byte[] deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
+        throws JsonParseException {
+      return Base64.decodeBase64(json.getAsString());
     }
 
-    public void setPluginId(String pluginId) {
-        this.pluginId = pluginId;
+    public JsonElement serialize(byte[] src, Type typeOfSrc, JsonSerializationContext context) {
+      return new JsonPrimitive(Base64.encodeBase64String(src));
     }
+  }
 
-    public Object getPluginInstance() {
-        return pluginInstance;
-    }
+  @Override
+  public void run() {
 
-    public void setPluginInstance(Object pluginInstance) {
-        this.pluginInstance = pluginInstance;
-        log = LoggerFactory.getLogger(pluginInstance.getClass().getName());
-    }
+    try {
+      initRabbitMQ();
 
-    public boolean isExit() {
-        return exit;
-    }
+      while (!exit) {
+        log.info("\nAwaiting RPC requests");
+        QueueingConsumer.Delivery delivery = consumer.nextDelivery();
 
-    public void setExit(boolean exit) {
-        this.exit = exit;
-    }
+        BasicProperties props = delivery.getProperties();
+        BasicProperties replyProps =
+            new BasicProperties.Builder()
+                .correlationId(props.getCorrelationId())
+                //                        .contentType("plain/text")
+                .build();
 
-    private static class ByteArrayToBase64TypeAdapter implements JsonSerializer<byte[]>, JsonDeserializer<byte[]> {
-        public byte[] deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-            return Base64.decodeBase64(json.getAsString());
-        }
+        String message = new String(delivery.getBody());
 
-        public JsonElement serialize(byte[] src, Type typeOfSrc, JsonSerializationContext context) {
-            return new JsonPrimitive(Base64.encodeBase64String(src));
-        }
-    }
+        log.debug("Received message");
 
-    @Override
-    public void run() {
+        PluginAnswer answer = new PluginAnswer();
 
         try {
-            initRabbitMQ();
+          answer.setAnswer(executeMethod(message));
+        } catch (InvocationTargetException e) {
+          answer.setException(e.getTargetException());
+        }
 
-            while (!exit) {
-                log.info("\nAwaiting RPC requests");
-                QueueingConsumer.Delivery delivery = consumer.nextDelivery();
+        String response = gson.toJson(answer);
 
-                BasicProperties props = delivery.getProperties();
-                BasicProperties replyProps = new BasicProperties
-                        .Builder()
-                        .correlationId(props.getCorrelationId())
-//                        .contentType("plain/text")
-                        .build();
+        log.debug("Answer is: " + response);
+        log.debug("Reply queue is: " + props.getReplyTo());
 
-                String message = new String(delivery.getBody());
+        channel.basicPublish(exchange, props.getReplyTo(), replyProps, response.getBytes());
 
-                log.debug("Received message");
+        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+      }
+      channel.close();
+      connection.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+    } catch (TimeoutException e) {
+      e.printStackTrace();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    } catch (NoSuchMethodException e) {
+      e.printStackTrace();
+    } catch (IllegalAccessException e) {
+      e.printStackTrace();
+    } catch (NotFoundException e) {
+      e.printStackTrace();
+    }
+  }
 
-                PluginAnswer answer = new PluginAnswer();
+  private Serializable executeMethod(String pluginMessageString)
+      throws NoSuchMethodException, InvocationTargetException, IllegalAccessException,
+          NotFoundException {
 
-                try {
-                    answer.setAnswer(executeMethod(message));
-                } catch (InvocationTargetException e) {
-                    answer.setException(e.getTargetException());
-                }
+    JsonObject pluginMessageObject = gson.fromJson(pluginMessageString, JsonObject.class);
 
-                String response = gson.toJson(answer);
+    List<Object> params = new ArrayList<Object>();
 
-                log.debug("Answer is: " + response);
-                log.debug("Reply queue is: " + props.getReplyTo());
+    for (JsonElement param : pluginMessageObject.get("parameters").getAsJsonArray()) {
+      Object p = gson.fromJson(param, Object.class);
+      if (p != null) params.add(p);
+    }
 
-                channel.basicPublish(exchange, props.getReplyTo(), replyProps, response.getBytes());
+    Class pluginClass = pluginInstance.getClass();
 
-                channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+    log.debug("There are " + params.size() + " parameters");
+
+    for (Method m : pluginClass.getMethods()) {
+      log.debug(
+          "Method checking is: "
+              + m.getName()
+              + " with "
+              + m.getParameterTypes().length
+              + " parameters");
+      if (m.getName().equals(pluginMessageObject.get("methodName").getAsString())
+          && m.getParameterTypes().length == params.size()) {
+        if (!m.getReturnType().equals(Void.class)) {
+          if (params.size() != 0) {
+            params =
+                getParameters(
+                    pluginMessageObject.get("parameters").getAsJsonArray(), m.getParameterTypes());
+            return (Serializable) m.invoke(pluginInstance, params.toArray());
+          } else return (Serializable) m.invoke(pluginInstance);
+        } else {
+          if (params.size() != 0) {
+            params =
+                getParameters(
+                    pluginMessageObject.get("parameters").getAsJsonArray(), m.getParameterTypes());
+            for (Object p : params) {
+              log.debug("param class is: " + p.getClass());
             }
-            channel.close();
-            connection.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (TimeoutException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (NotFoundException e) {
-            e.printStackTrace();
+            m.invoke(pluginInstance, params.toArray());
+          } else m.invoke(pluginInstance);
+
+          return null;
         }
-
-
+      }
     }
 
-    private Serializable executeMethod(String pluginMessageString) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, NotFoundException {
+    throw new NotFoundException("method not found");
+  }
 
-        JsonObject pluginMessageObject = gson.fromJson(pluginMessageString, JsonObject.class);
-
-        List<Object> params = new ArrayList<Object>();
-
-        for (JsonElement param : pluginMessageObject.get("parameters").getAsJsonArray()){
-            Object p = gson.fromJson(param, Object.class);
-            if (p!= null)
-                params.add(p);
-        }
-
-        Class pluginClass = pluginInstance.getClass();
-
-        log.debug("There are " + params.size() + " parameters");
-
-        for (Method m : pluginClass.getMethods()){
-            log.debug("Method checking is: " + m.getName() + " with " + m.getParameterTypes().length + " parameters");
-            if (m.getName().equals(pluginMessageObject.get("methodName").getAsString()) && m.getParameterTypes().length == params.size()){
-                if (!m.getReturnType().equals(Void.class)) {
-                    if (params.size() != 0) {
-                        params = getParameters(pluginMessageObject.get("parameters").getAsJsonArray(), m.getParameterTypes());
-                        return (Serializable) m.invoke(pluginInstance, params.toArray());
-                    }
-                    else
-                        return (Serializable) m.invoke(pluginInstance);
-                }
-                else{
-                    if (params.size() != 0) {
-                        params = getParameters(pluginMessageObject.get("parameters").getAsJsonArray(), m.getParameterTypes());
-                        for (Object p : params){
-                            log.debug("param class is: " + p.getClass());
-                        }
-                        m.invoke(pluginInstance, params.toArray());
-                    }
-                    else
-                        m.invoke(pluginInstance);
-
-                    return null;
-                }
-            }
-        }
-
-        throw new NotFoundException("method not found");
-
+  private List<Object> getParameters(JsonArray parameters, Class<?>[] parameterTypes) {
+    List<Object> res = new LinkedList<Object>();
+    for (int i = 0; i < parameters.size(); i++) {
+      res.add(gson.fromJson(parameters.get(i), parameterTypes[i]));
     }
+    return res;
+  }
 
-    private List<Object> getParameters(JsonArray parameters, Class<?>[] parameterTypes) {
-        List<Object> res = new LinkedList<Object>();
-        for (int i =0 ; i < parameters.size(); i++){
-            res.add( gson.fromJson(parameters.get(i), parameterTypes[i]) );
-        }
-        return res;
-    }
+  private void initRabbitMQ() throws IOException, TimeoutException {
+    ConnectionFactory factory = new ConnectionFactory();
+    factory.setHost(brokerIp);
+    factory.setPort(brokerPort);
+    factory.setPassword(password);
+    factory.setUsername(username);
 
-    private void initRabbitMQ() throws IOException, TimeoutException {
-        ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost(brokerIp);
-        factory.setPort(brokerPort);
-        factory.setPassword(password);
-        factory.setUsername(username);
+    connection = factory.newConnection();
+    channel = connection.createChannel();
 
-        connection = factory.newConnection();
-        channel = connection.createChannel();
+    channel.exchangeDeclare(exchange, "topic");
+    channel.queueDeclare(pluginId, false, false, true, null);
+    channel.queueBind(pluginId, exchange, pluginId);
 
-        channel.exchangeDeclare(exchange, "topic");
-        channel.queueDeclare(pluginId, false, false, true, null);
-        channel.queueBind(pluginId, exchange, pluginId);
+    channel.basicQos(1);
 
-        channel.basicQos(1);
+    consumer = new QueueingConsumer(channel);
+    channel.basicConsume(pluginId, false, consumer);
+  }
 
-        consumer = new QueueingConsumer(channel);
-        channel.basicConsume(pluginId, false, consumer);
-    }
+  public String getBrokerIp() {
+    return brokerIp;
+  }
 
-    public String getBrokerIp() {
-        return brokerIp;
-    }
+  public void setBrokerIp(String brokerIp) {
+    this.brokerIp = brokerIp;
+  }
 
-    public void setBrokerIp(String brokerIp) {
-        this.brokerIp = brokerIp;
-    }
+  public int getBrokerPort() {
+    return brokerPort;
+  }
 
-    public int getBrokerPort() {
-        return brokerPort;
-    }
+  public void setBrokerPort(int brokerPort) {
+    this.brokerPort = brokerPort;
+  }
 
-    public void setBrokerPort(int brokerPort) {
-        this.brokerPort = brokerPort;
-    }
+  public String getUsername() {
+    return username;
+  }
 
-    public String getUsername() {
-        return username;
-    }
+  public void setUsername(String username) {
+    this.username = username;
+  }
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
+  public String getPassword() {
+    return password;
+  }
 
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
+  public void setPassword(String password) {
+    this.password = password;
+  }
 }
