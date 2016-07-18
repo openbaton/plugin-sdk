@@ -8,9 +8,12 @@ repositories {
 
 
 dependencies {
-    compile 'org.openbaton:vim-drivers:2.1.0'
-    compile 'org.openbaton:monitoring:2.1.0'
-    compile 'org.openbaton:exception:2.1.0'
+    compile 'org.openbaton:vim-drivers:2.1.1'
+
+    compile 'org.openbaton:monitoring:2.1.1'
+
+    compile 'org.openbaton:exception:2.1.1'
+
 
     compile 'org.slf4j:slf4j-api:1.7.12'
 
