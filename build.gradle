@@ -21,6 +21,7 @@ buildscript {
         classpath 'com.bmuschko:gradle-nexus-plugin:2.3.1'
     }
 }
+
 plugins {
     id 'net.researchgate.release' version '2.1.2'
     id "com.github.sherter.google-java-format" version "0.3.2"
@@ -56,6 +57,8 @@ project.ext {
     //------------------------------------------------//
     mainClass = 'org.openbaton.plugin.main.spring.SpringPlugin'
 }
+
+apply from: 'gradle/gradle/nexus.upload.plugin.gradle'
 
 subprojects {
 
@@ -103,73 +106,6 @@ repositories {
 }
 
 dependencies {
-}
-
-project(':plugin-sdk') {
-    apply plugin: 'com.bmuschko.nexus'
-
-    modifyPom {
-        project {
-            name 'OpenBaton'
-            description 'Openbaton libraries for almost everything'
-            url 'http://openbaton.github.io'
-            inceptionYear '2015'
-            scm {
-                url 'http://openbaton.github.io'
-                connection ''
-                developerConnection 'https://github.com/openbaton'
-            }
-
-            licenses {
-                license {
-                    name 'The Apache Software License, Version 2.0'
-                    url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                    distribution 'repo'
-                }
-            }
-
-            developers {
-                developer {
-                    id 'lto'
-                    name 'Lorenzo Tomasini'
-                    email 'lorenzo.tomasini@fokus.fraunhofer.de'
-                }
-                developer {
-                    id 'gca'
-                    name 'Giuseppe Carella'
-                    email 'giuseppe.carella@fokus.fraunhofer.de'
-                }
-            }
-        }
-    }
-
-    extraArchive {
-        sources = true
-        tests = false
-        javadoc = true
-    }
-
-    nexus {
-        sign = false
-        repositoryUrl = 'http://get.openbaton.org:8081/nexus/content/repositories/thirdparty/'
-        snapshotRepositoryUrl = 'http://get.openbaton.org:8081/nexus/content/repositories/snapshots/'
-    }
-}
-
-release {
-    failOnCommitNeeded = true
-    failOnPublishNeeded = true
-    failOnSnapshotDependencies = true
-    failOnUnversionedFiles = true
-    failOnUpdateNeeded = true
-    revertOnFail = true
-    preCommitText = ''
-    preTagCommitMessage = 'Pre-tag commit: '
-    tagCommitMessage = 'Creating tag: '
-    newVersionCommitMessage = 'New version commit: '
-    tagTemplate = '${version}'
-    versionPropertyFile = 'gradle.properties'
-    versionProperties = []
 }
 
 build.dependsOn verifyGoogleJavaFormat

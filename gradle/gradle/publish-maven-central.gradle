@@ -1,0 +1,90 @@
+apply plugin: 'signing'
+apply plugin: 'maven'
+import org.gradle.plugins.signing.Sign
+
+
+task javadocJar(type: Jar) {
+    classifier = 'javadoc'
+    from javadoc
+}
+
+task sourcesJar(type: Jar) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+artifacts {
+    archives javadocJar, sourcesJar
+}
+
+
+signing {
+    sign configurations.archives
+}
+
+
+gradle.taskGraph.whenReady { taskGraph ->
+    if (taskGraph.allTasks.any { it  instanceof Sign }) {
+        Console console = System.console()
+        console.printf "\n\nWe have to sign some things in this build." +
+                       "\n\nPlease enter your signing details.\n\n"
+
+        def id = console.readLine("PGP Key Id: ")
+        def file = console.readLine("PGP Secret Key Ring File (absolute path): ")
+        def password = console.readPassword("PGP Private Key Password: ")
+
+        allprojects { ext."signing.keyId" = id }
+        allprojects { ext."signing.secretKeyRingFile" = file }
+        allprojects { ext."signing.password" = password }
+
+        console.printf "\nThanks.\n\n"
+    }
+}
+      
+
+
+uploadArchives {
+  repositories {
+    mavenDeployer {
+      beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+      repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+        authentication(userName: ossrhUsername, password: ossrhPassword)
+      }
+
+      snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+        authentication(userName: ossrhUsername, password: ossrhPassword)
+      }
+
+      pom.project {
+        name 'Plugin SDK'
+        packaging 'jar'
+        // optionally artifactId can be defined here 
+        description 'SDK needed for creating new plugins'
+        url 'https://github.com/openbaton/plugin-sdk'
+
+        scm {
+          connection 'scm:git:git@github.com:openbaton/plugin-sdk.git'
+          developerConnection 'scm:git:git@github.com:openbaton/plugin-sdk.git'
+          url 'https://github.com/openbaton/plugin-sdk'
+        }
+
+        licenses {
+          license {
+            name 'The Apache License, Version 2.0'
+            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+          }
+        }
+
+        developers {
+          developer {
+            id 'gc4rella'
+            name 'Giuseppe Carella'
+            email 'cargius@gmail.com'
+          }
+        }
+      }
+    }
+  }
+}
+
