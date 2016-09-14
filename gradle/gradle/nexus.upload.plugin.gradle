@@ -17,7 +17,7 @@ gradle.taskGraph.whenReady { taskGraph ->
     }
 }
 
-subprojects {
+allprojects {
     apply plugin: 'com.bmuschko.nexus'
 
     modifyPom {

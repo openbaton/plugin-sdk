@@ -27,6 +27,9 @@ plugins {
     id "com.github.sherter.google-java-format" version "0.3.2"
 }
 
+apply from: 'gradle/gradle/nexus.upload.plugin.gradle'
+
+apply plugin: 'com.bmuschko.nexus'
 apply plugin: 'java'
 apply plugin: 'idea'
 apply plugin: 'eclipse'
@@ -60,28 +63,48 @@ project.ext {
     openbatonVersion = "2.1.4-SNAPSHOT"
 }
 
-apply from: 'gradle/gradle/nexus.upload.plugin.gradle'
 
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
 
-sourceSets {
-    main {
-        java { srcDir 'src/main/java' }
-        resources { srcDir 'src/main/resources' }
+allprojects {
+
+    apply plugin: 'java'
+    apply plugin: 'maven'
+
+    group = 'org.openbaton'
+
+    sourceCompatibility = 1.7
+    targetCompatibility = 1.7
+
+    repositories {
+        mavenCentral()
     }
 
-    test {
-        java { srcDir 'src/test/java' }
-        resources { srcDir 'src/test/resources' }
+    sourceSets {
+        main {
+            java      { srcDir 'src/main/java'}
+            resources { srcDir 'src/main/resources'}
+        }
+
+        test {
+            java      { srcDir 'src/test/java'}
+            resources { srcDir 'src/test/resources'}
+        }
+
+        integration {
+            java      { srcDir 'src/test/integration/java' }
+            resources { srcDir 'src/test/resources'}
+            compileClasspath += sourceSets.test.compileClasspath
+            runtimeClasspath += sourceSets.test.runtimeClasspath
+            output.classesDir = sourceSets.test.output.classesDir
+        }
+
     }
 
-    integration {
-        java { srcDir 'src/test/integration/java' }
-        resources { srcDir 'src/test/resources' }
-        compileClasspath += sourceSets.test.compileClasspath
-        runtimeClasspath += sourceSets.test.runtimeClasspath
-        output.classesDir = sourceSets.test.output.classesDir
+    dependencies {
+        integrationCompile sourceSets.test.output
     }
-
 }
 
 dependencies {
@@ -104,5 +127,22 @@ repositories {
         url "https://oss.sonatype.org/content/repositories/snapshots/"
     }
 }
+
+release {
+    failOnCommitNeeded = true
+    failOnPublishNeeded = true
+    failOnSnapshotDependencies = true
+    failOnUnversionedFiles = true
+    failOnUpdateNeeded = true
+    revertOnFail = true
+    preCommitText = ''
+    preTagCommitMessage = 'Pre-tag commit: '
+    tagCommitMessage = 'Creating tag: '
+    newVersionCommitMessage = 'New version commit: '
+    tagTemplate = '${version}'
+    versionPropertyFile = 'gradle.properties'
+    versionProperties = []
+}
+
 
 compileJava.dependsOn tasks.googleJavaFormat
