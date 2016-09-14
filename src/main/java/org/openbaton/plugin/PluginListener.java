@@ -6,6 +6,7 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.QueueingConsumer;
+
 import org.apache.commons.codec.binary.Base64;
 import org.openbaton.catalogue.nfvo.PluginAnswer;
 import org.openbaton.exceptions.NotFoundException;
@@ -87,18 +88,34 @@ public class PluginListener implements Runnable {
 
     try {
       initRabbitMQ();
+    } catch (IOException e) {
+      e.printStackTrace();
+      setExit(true);
+    } catch (TimeoutException e) {
+      e.printStackTrace();
+      setExit(true);
+    }
+    try {
 
       while (!exit) {
+        QueueingConsumer.Delivery delivery;
+        BasicProperties props;
+        BasicProperties replyProps;
+        try {
+          delivery = consumer.nextDelivery();
+
+          props = delivery.getProperties();
+          replyProps =
+              new BasicProperties.Builder()
+                  .correlationId(props.getCorrelationId())
+                  //                        .contentType("plain/text")
+                  .build();
+        } catch (Exception e) {
+          e.printStackTrace();
+          exit = true;
+          continue;
+        }
         log.info("\nAwaiting RPC requests");
-        QueueingConsumer.Delivery delivery = consumer.nextDelivery();
-
-        BasicProperties props = delivery.getProperties();
-        BasicProperties replyProps =
-            new BasicProperties.Builder()
-                .correlationId(props.getCorrelationId())
-                //                        .contentType("plain/text")
-                .build();
-
         String message = new String(delivery.getBody());
 
         log.debug("Received message");
@@ -109,30 +126,44 @@ public class PluginListener implements Runnable {
           answer.setAnswer(executeMethod(message));
         } catch (InvocationTargetException e) {
           answer.setException(e.getTargetException());
+        } catch (Exception e) {
+          e.printStackTrace();
+          answer.setException(e);
         }
 
-        String response = gson.toJson(answer);
+        String response;
+        try {
+          response = gson.toJson(answer);
 
-        log.debug("Answer is: " + response);
-        log.debug("Reply queue is: " + props.getReplyTo());
+          log.debug("Answer is: " + response);
+          log.debug("Reply queue is: " + props.getReplyTo());
 
-        channel.basicPublish(exchange, props.getReplyTo(), replyProps, response.getBytes());
+          channel.basicPublish(exchange, props.getReplyTo(), replyProps, response.getBytes());
 
-        channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+          channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+        } catch (Exception e) {
+          e.printStackTrace();
+          answer.setException(e);
+          log.debug("Answer is: " + answer);
+          log.debug("Reply queue is: " + props.getReplyTo());
+
+          channel.basicPublish(
+              exchange, props.getReplyTo(), replyProps, gson.toJson(answer).getBytes());
+
+          channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+          setExit(true);
+        }
       }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    try {
       channel.close();
       connection.close();
     } catch (IOException e) {
       e.printStackTrace();
     } catch (TimeoutException e) {
-      e.printStackTrace();
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    } catch (NoSuchMethodException e) {
-      e.printStackTrace();
-    } catch (IllegalAccessException e) {
-      e.printStackTrace();
-    } catch (NotFoundException e) {
       e.printStackTrace();
     }
   }
@@ -147,7 +178,9 @@ public class PluginListener implements Runnable {
 
     for (JsonElement param : pluginMessageObject.get("parameters").getAsJsonArray()) {
       Object p = gson.fromJson(param, Object.class);
-      if (p != null) params.add(p);
+      if (p != null) {
+        params.add(p);
+      }
     }
 
     Class pluginClass = pluginInstance.getClass();
@@ -169,7 +202,9 @@ public class PluginListener implements Runnable {
                 getParameters(
                     pluginMessageObject.get("parameters").getAsJsonArray(), m.getParameterTypes());
             return (Serializable) m.invoke(pluginInstance, params.toArray());
-          } else return (Serializable) m.invoke(pluginInstance);
+          } else {
+            return (Serializable) m.invoke(pluginInstance);
+          }
         } else {
           if (params.size() != 0) {
             params =
@@ -179,7 +214,9 @@ public class PluginListener implements Runnable {
               log.debug("param class is: " + p.getClass());
             }
             m.invoke(pluginInstance, params.toArray());
-          } else m.invoke(pluginInstance);
+          } else {
+            m.invoke(pluginInstance);
+          }
 
           return null;
         }
