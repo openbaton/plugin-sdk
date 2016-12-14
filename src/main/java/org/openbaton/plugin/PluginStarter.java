@@ -15,17 +15,12 @@
 
 package org.openbaton.plugin;
 
-import org.openbaton.monitoring.interfaces.VirtualisedResourcesPerformanceManagement;
-import org.openbaton.plugin.utils.StartupPlugin;
-import org.openbaton.vim.drivers.interfaces.ClientInterfaces;
+import org.openbaton.plugin.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
-import java.rmi.NotBoundException;
-import java.rmi.RemoteException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -38,117 +33,14 @@ import java.util.concurrent.TimeoutException;
  */
 public class PluginStarter {
 
-  protected static Logger log = LoggerFactory.getLogger(PluginStarter.class);
+  protected static final Logger log = LoggerFactory.getLogger(PluginStarter.class);
   private static Map<String, PluginListener> plugins = new HashMap<String, PluginListener>();
   private static Properties properties;
   private static ExecutorService executor;
 
-  public static void run(Class clazz, final String name, final String registryIp) {
-    String nm = "";
-    try {
-      log.info("Starting plugin with name: " + name);
-      log.debug("Registry ip: " + registryIp);
-      log.debug("Class to register: " + clazz.getName());
-      Properties properties = new Properties();
-      properties.load(clazz.getResourceAsStream("/plugin.conf.properties"));
-      String inte = "";
-      for (Class interf : clazz.getSuperclass().getInterfaces())
-        if (interf.getName().equals(ClientInterfaces.class.getName())) {
-          inte = "vim-drivers";
-          break;
-        } else if (interf
-            .getName()
-            .equals(VirtualisedResourcesPerformanceManagement.class.getName())) {
-          inte = "monitor";
-          break;
-        } else inte = "unknown-interface";
-
-      if (inte.equals("unknown-interface")) // no interface found
-      throw new RuntimeException(
-            "The plugin class "
-                + clazz.getSimpleName()
-                + " needs to extend or VimDriver or Monitoring classes");
-
-      nm = inte + "." + properties.getProperty("type", "unknown") + "." + name;
-      StartupPlugin.register(clazz, nm, registryIp, 1099);
-
-    } catch (Exception e) {
-      e.printStackTrace();
-      System.exit(2);
-    }
-    final String fullName = nm;
-    final Thread mainThread = Thread.currentThread();
-    Runtime.getRuntime()
-        .addShutdownHook(
-            new Thread() {
-              public void run() {
-                try {
-                  mainThread.join();
-                  log.info("Unregistering: " + fullName);
-                  StartupPlugin.unregister(fullName, registryIp);
-                } catch (InterruptedException e) {
-                  e.printStackTrace();
-                } catch (RemoteException e) {
-                  e.printStackTrace();
-                } catch (MalformedURLException e) {
-                  e.printStackTrace();
-                } catch (NotBoundException e) {
-                  e.printStackTrace();
-                }
-              }
-            });
-  }
-
-  public static void run(Class clazz, final String name, final String registryIp, int port) {
-    String nm = "";
-    try {
-      log.info("Starting plugin with name: " + name);
-      log.debug("Registry ip: " + registryIp);
-      log.debug("Class to register: " + clazz.getName());
-      nm = getFinalName(clazz, name);
-      StartupPlugin.register(clazz, nm, registryIp, port);
-
-    } catch (Exception e) {
-      e.printStackTrace();
-      System.exit(2);
-    }
-    final String fullName = nm;
-    final Thread mainThread = Thread.currentThread();
-    Runtime.getRuntime()
-        .addShutdownHook(
-            new Thread() {
-              public void run() {
-                try {
-                  mainThread.join();
-                  log.info("Unregistering: " + fullName);
-                  StartupPlugin.unregister(fullName, registryIp);
-                } catch (InterruptedException e) {
-                  e.printStackTrace();
-                } catch (RemoteException e) {
-                  e.printStackTrace();
-                } catch (MalformedURLException e) {
-                  e.printStackTrace();
-                } catch (NotBoundException e) {
-                  e.printStackTrace();
-                }
-              }
-            });
-  }
-
   private static String getFinalName(Class clazz, String name) throws IOException {
     getProperties(clazz);
-    String inte = "";
-    for (Class interf : clazz.getSuperclass().getInterfaces())
-      if (interf.getName().equals(ClientInterfaces.class.getName())) {
-        inte = "vim-drivers";
-        break;
-      } else if (interf
-          .getName()
-          .equals(VirtualisedResourcesPerformanceManagement.class.getName())) {
-        inte = "monitor";
-        break;
-      } else inte = "unknown-interface";
-
+    String inte = Utils.checkInterface(clazz);
     if (inte.equals("unknown-interface")) // no interface found
     throw new RuntimeException(
           "The plugin class "
@@ -164,7 +56,7 @@ public class PluginStarter {
 
   public static void registerPlugin(
       Class clazz, String name, String brokerIp, int port, int consumers)
-      throws IOException, TimeoutException, NoSuchMethodException, IllegalAccessException,
+      throws IOException, NoSuchMethodException, IllegalAccessException,
           InvocationTargetException, InstantiationException {
     getProperties(clazz);
     String username = properties.getProperty("username", "admin");
@@ -172,7 +64,7 @@ public class PluginStarter {
     registerPlugin(clazz, name, brokerIp, port, consumers, username, password);
   }
 
-  public static void registerPlugin(
+  protected static void registerPlugin(
       Class clazz,
       String name,
       String brokerIp,
