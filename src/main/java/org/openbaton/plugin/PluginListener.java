@@ -88,10 +88,7 @@ public class PluginListener implements Runnable {
 
     try {
       initRabbitMQ();
-    } catch (IOException e) {
-      e.printStackTrace();
-      setExit(true);
-    } catch (TimeoutException e) {
+    } catch (IOException | TimeoutException e) {
       e.printStackTrace();
       setExit(true);
     }
@@ -115,10 +112,11 @@ public class PluginListener implements Runnable {
           exit = true;
           continue;
         }
-        log.info("\nAwaiting RPC requests");
+        log.info("\nWaiting for RPC requests");
         String message = new String(delivery.getBody());
 
         log.debug("Received message");
+        log.trace("Message content received: "+message);
 
         PluginAnswer answer = new PluginAnswer();
 
@@ -161,15 +159,13 @@ public class PluginListener implements Runnable {
     try {
       channel.close();
       connection.close();
-    } catch (IOException e) {
-      e.printStackTrace();
-    } catch (TimeoutException e) {
+    } catch (IOException | TimeoutException e) {
       e.printStackTrace();
     }
   }
 
   private Serializable executeMethod(String pluginMessageString)
-      throws NoSuchMethodException, InvocationTargetException, IllegalAccessException,
+      throws InvocationTargetException, IllegalAccessException,
           NotFoundException {
 
     JsonObject pluginMessageObject = gson.fromJson(pluginMessageString, JsonObject.class);
