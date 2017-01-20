@@ -56,8 +56,8 @@ public class PluginStarter {
 
   public static void registerPlugin(
       Class clazz, String name, String brokerIp, int port, int consumers)
-      throws IOException, NoSuchMethodException, IllegalAccessException,
-          InvocationTargetException, InstantiationException {
+      throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
+          InstantiationException {
     getProperties(clazz);
     String username = properties.getProperty("username", "admin");
     String password = properties.getProperty("password", "openbaton");

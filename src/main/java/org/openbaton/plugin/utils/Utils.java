@@ -8,16 +8,16 @@ import org.openbaton.vim.drivers.interfaces.ClientInterfaces;
  */
 public class Utils {
 
-    public static String checkInterface(Class clazz){
-        for (Class interf : clazz.getSuperclass().getInterfaces()) {
-            if (interf.getName().equals(ClientInterfaces.class.getName())) {
-                return "vim-drivers";
-            } else if (interf
-                    .getName()
-                    .equals(VirtualisedResourcesPerformanceManagement.class.getName())) {
-                return "monitor";
-            }
-        }
-        return "unknown-interface";
+  public static String checkInterface(Class clazz) {
+    for (Class interf : clazz.getSuperclass().getInterfaces()) {
+      if (interf.getName().equals(ClientInterfaces.class.getName())) {
+        return "vim-drivers";
+      } else if (interf
+          .getName()
+          .equals(VirtualisedResourcesPerformanceManagement.class.getName())) {
+        return "monitor";
+      }
     }
+    return "unknown-interface";
+  }
 }

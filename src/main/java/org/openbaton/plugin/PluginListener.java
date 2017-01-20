@@ -116,7 +116,7 @@ public class PluginListener implements Runnable {
         String message = new String(delivery.getBody());
 
         log.debug("Received message");
-        log.trace("Message content received: "+message);
+        log.trace("Message content received: " + message);
 
         PluginAnswer answer = new PluginAnswer();
 
@@ -165,8 +165,7 @@ public class PluginListener implements Runnable {
   }
 
   private Serializable executeMethod(String pluginMessageString)
-      throws InvocationTargetException, IllegalAccessException,
-          NotFoundException {
+      throws InvocationTargetException, IllegalAccessException, NotFoundException {
 
     JsonObject pluginMessageObject = gson.fromJson(pluginMessageString, JsonObject.class);
 
