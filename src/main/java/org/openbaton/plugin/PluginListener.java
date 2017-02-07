@@ -181,21 +181,30 @@ public class PluginListener implements Runnable {
     Class pluginClass = pluginInstance.getClass();
 
     log.debug("There are " + params.size() + " parameters");
+    String methodName = pluginMessageObject.get("methodName").getAsString();
+    log.debug("Looking for method: " + methodName);
 
     for (Method m : pluginClass.getMethods()) {
-      log.debug(
+      log.trace(
           "Method checking is: "
               + m.getName()
               + " with "
               + m.getParameterTypes().length
               + " parameters");
-      if (m.getName().equals(pluginMessageObject.get("methodName").getAsString())
-          && m.getParameterTypes().length == params.size()) {
+      byte[] avoid = new byte[0];
+      if (m.getName().equals(methodName)
+          && m.getParameterTypes().length == params.size()
+          && !m.getParameterTypes()[m.getParameterTypes().length - 1]
+              .getCanonicalName()
+              .equals(avoid.getClass().getCanonicalName())) {
         if (!m.getReturnType().equals(Void.class)) {
           if (params.size() != 0) {
             params =
                 getParameters(
                     pluginMessageObject.get("parameters").getAsJsonArray(), m.getParameterTypes());
+            for (Object p : params) {
+              log.trace("param class is: " + p.getClass());
+            }
             return (Serializable) m.invoke(pluginInstance, params.toArray());
           } else {
             return (Serializable) m.invoke(pluginInstance);
@@ -206,7 +215,7 @@ public class PluginListener implements Runnable {
                 getParameters(
                     pluginMessageObject.get("parameters").getAsJsonArray(), m.getParameterTypes());
             for (Object p : params) {
-              log.debug("param class is: " + p.getClass());
+              log.trace("param class is: " + p.getClass());
             }
             m.invoke(pluginInstance, params.toArray());
           } else {
