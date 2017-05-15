@@ -60,7 +60,7 @@ public class PluginStarter {
   public static void registerPlugin(
       Class clazz, String name, String brokerIp, int port, int consumers)
       throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
-          InstantiationException, TimeoutException {
+          InstantiationException, TimeoutException, InterruptedException {
     getProperties(clazz);
     String username = properties.getProperty("username", "admin");
     String password = properties.getProperty("password", "openbaton");
@@ -76,7 +76,7 @@ public class PluginStarter {
       String username,
       String password)
       throws IOException, InstantiationException, IllegalAccessException, InvocationTargetException,
-          NoSuchMethodException, TimeoutException {
+          NoSuchMethodException, TimeoutException, InterruptedException {
     Registration registration = new Registration();
     ManagerCredentials managerCredentials =
         registration.registerPluginToNfvo(
