@@ -64,7 +64,8 @@ public class PluginStarter {
     getProperties(clazz);
     String username = properties.getProperty("username", "admin");
     String password = properties.getProperty("password", "openbaton");
-    registerPlugin(clazz, name, brokerIp, port, consumers, username, password);
+    String virtualHost = properties.getProperty("virtual-host", "/");
+    registerPlugin(clazz, name, brokerIp, port, consumers, username, password, virtualHost);
   }
 
   protected static void registerPlugin(
@@ -74,13 +75,14 @@ public class PluginStarter {
       int port,
       int consumers,
       String username,
-      String password)
+      String password,
+      String virtualHost)
       throws IOException, InstantiationException, IllegalAccessException, InvocationTargetException,
           NoSuchMethodException, TimeoutException, InterruptedException {
     Registration registration = new Registration();
     ManagerCredentials managerCredentials =
         registration.registerPluginToNfvo(
-            brokerIp, port, username, password, getFinalName(clazz, name));
+            brokerIp, port, username, password, virtualHost, getFinalName(clazz, name));
     // registration.registerPluginToNfvo(factory, pluginId);
     if (properties == null) getProperties(clazz);
     executor = Executors.newFixedThreadPool(consumers);
@@ -92,6 +94,7 @@ public class PluginStarter {
       pluginListener.setBrokerPort(port);
       pluginListener.setUsername(managerCredentials.getRabbitUsername());
       pluginListener.setPassword(managerCredentials.getRabbitPassword());
+      pluginListener.setVirtualHost(virtualHost);
 
       executor.execute(pluginListener);
     }
