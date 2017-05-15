@@ -15,7 +15,10 @@
 
 package org.openbaton.plugin;
 
+import com.rabbitmq.client.ConnectionFactory;
+import org.openbaton.catalogue.nfvo.ManagerCredentials;
 import org.openbaton.plugin.utils.Utils;
+import org.openbaton.registration.Registration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +60,7 @@ public class PluginStarter {
   public static void registerPlugin(
       Class clazz, String name, String brokerIp, int port, int consumers)
       throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
-          InstantiationException {
+          InstantiationException, TimeoutException {
     getProperties(clazz);
     String username = properties.getProperty("username", "admin");
     String password = properties.getProperty("password", "openbaton");
@@ -73,7 +76,12 @@ public class PluginStarter {
       String username,
       String password)
       throws IOException, InstantiationException, IllegalAccessException, InvocationTargetException,
-          NoSuchMethodException {
+          NoSuchMethodException, TimeoutException {
+    Registration registration = new Registration();
+    ManagerCredentials managerCredentials =
+        registration.registerPluginToNfvo(
+            brokerIp, port, username, password, getFinalName(clazz, name));
+    // registration.registerPluginToNfvo(factory, pluginId);
     if (properties == null) getProperties(clazz);
     executor = Executors.newFixedThreadPool(consumers);
     for (int i = 0; i < consumers; i++) {
@@ -82,8 +90,8 @@ public class PluginStarter {
       pluginListener.setPluginInstance(clazz.getConstructor().newInstance());
       pluginListener.setBrokerIp(brokerIp);
       pluginListener.setBrokerPort(port);
-      pluginListener.setUsername(username);
-      pluginListener.setPassword(password);
+      pluginListener.setUsername(managerCredentials.getRabbitUsername());
+      pluginListener.setPassword(managerCredentials.getRabbitPassword());
 
       executor.execute(pluginListener);
     }

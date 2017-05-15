@@ -10,6 +10,7 @@ import com.rabbitmq.client.QueueingConsumer;
 import org.apache.commons.codec.binary.Base64;
 import org.openbaton.catalogue.nfvo.PluginAnswer;
 import org.openbaton.exceptions.NotFoundException;
+import org.openbaton.registration.Registration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
