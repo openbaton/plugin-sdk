@@ -63,8 +63,8 @@ public class PluginStarter {
       throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
           InstantiationException, TimeoutException, InterruptedException {
     getProperties(clazz);
-    String username = properties.getProperty("username", "admin");
-    String password = properties.getProperty("password", "openbaton");
+    String username = properties.getProperty("username", "guest");
+    String password = properties.getProperty("password", "guest");
     String virtualHost = properties.getProperty("virtual-host", "/");
     registerPlugin(clazz, name, brokerIp, port, consumers, username, password, virtualHost);
   }

@@ -251,7 +251,6 @@ public class PluginListener implements Runnable {
     connection = factory.newConnection();
     channel = connection.createChannel();
 
-    channel.exchangeDeclare(exchange, "topic", true); // TODO add a property for this?
     channel.queueDeclare(pluginId, false, false, true, null);
     channel.queueBind(pluginId, exchange, pluginId);
 
