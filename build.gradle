@@ -60,7 +60,7 @@ project.ext {
      */
     //------------------------------------------------//
     mainClass = 'org.openbaton.plugin.main.spring.SpringPlugin'
-    openbatonVersion = "3.2.1"
+    openbatonVersion = "3.2.3-SNAPSHOT"
 }
 
 
@@ -78,6 +78,7 @@ allprojects {
     targetCompatibility = 1.7
 
     repositories {
+        mavenLocal()
         mavenCentral()
         maven {
                 url "https://oss.sonatype.org/content/repositories/snapshots/"
@@ -124,6 +125,7 @@ dependencies {
 
 
 repositories {
+    mavenLocal()
     mavenCentral()
     // for snapshots
     maven {
