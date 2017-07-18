@@ -157,6 +157,7 @@ public class PluginListener implements Runnable {
     }
 
     try {
+      if (channel == null || connection == null) System.exit(3);
       channel.close();
       connection.close();
     } catch (IOException | TimeoutException e) {
