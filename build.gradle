@@ -115,6 +115,7 @@ dependencies {
     compile 'org.openbaton:vim-drivers:' + openbatonVersion
     compile 'org.openbaton:monitoring:' + openbatonVersion
     compile 'org.openbaton:exception:' + openbatonVersion
+    compile 'org.openbaton:registration:' + openbatonVersion
 
     compile 'com.google.code.gson:gson:2.5'
     compile 'org.slf4j:slf4j-api:1.7.12'

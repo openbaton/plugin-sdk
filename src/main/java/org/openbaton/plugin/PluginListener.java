@@ -10,6 +10,7 @@ import com.rabbitmq.client.QueueingConsumer;
 import org.apache.commons.codec.binary.Base64;
 import org.openbaton.catalogue.nfvo.PluginAnswer;
 import org.openbaton.exceptions.NotFoundException;
+import org.openbaton.registration.Registration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +29,7 @@ import java.util.concurrent.TimeoutException;
  */
 public class PluginListener implements Runnable {
 
-  private static final String exchange = "plugin-exchange";
+  private static final String exchange = "openbaton-exchange";
   private String pluginId;
   private Object pluginInstance;
   private Logger log;
@@ -44,6 +45,7 @@ public class PluginListener implements Runnable {
   private int brokerPort;
   private String username;
   private String password;
+  private String virtualHost;
   private Connection connection;
 
   public String getPluginId() {
@@ -245,11 +247,11 @@ public class PluginListener implements Runnable {
     factory.setPort(brokerPort);
     factory.setPassword(password);
     factory.setUsername(username);
+    factory.setVirtualHost(virtualHost);
 
     connection = factory.newConnection();
     channel = connection.createChannel();
 
-    channel.exchangeDeclare(exchange, "topic");
     channel.queueDeclare(pluginId, false, false, true, null);
     channel.queueBind(pluginId, exchange, pluginId);
 
@@ -289,5 +291,13 @@ public class PluginListener implements Runnable {
 
   public void setPassword(String password) {
     this.password = password;
+  }
+
+  public String getVirtualHost() {
+    return this.virtualHost;
+  }
+
+  public void setVirtualHost(String virtualHost) {
+    this.virtualHost = virtualHost;
   }
 }

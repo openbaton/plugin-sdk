@@ -15,7 +15,10 @@
 
 package org.openbaton.plugin;
 
+import com.rabbitmq.client.ConnectionFactory;
+import org.openbaton.catalogue.nfvo.ManagerCredentials;
 import org.openbaton.plugin.utils.Utils;
+import org.openbaton.registration.Registration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +29,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -57,33 +61,63 @@ public class PluginStarter {
   public static void registerPlugin(
       Class clazz, String name, String brokerIp, int port, int consumers)
       throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
-          InstantiationException {
+          InstantiationException, TimeoutException, InterruptedException {
     getProperties(clazz);
-    String username = properties.getProperty("username", "admin");
-    String password = properties.getProperty("password", "openbaton");
-    registerPlugin(clazz, name, brokerIp, port, consumers, username, password);
+    String username = properties.getProperty("username", "guest");
+    String password = properties.getProperty("password", "guest");
+    String virtualHost = properties.getProperty("virtual-host", "/");
+    registerPlugin(clazz, name, brokerIp, port, consumers, username, password, virtualHost);
   }
 
   protected static void registerPlugin(
       Class clazz,
       String name,
-      String brokerIp,
-      int port,
+      final String brokerIp,
+      final int port,
       int consumers,
-      String username,
-      String password)
+      final String username,
+      final String password,
+      final String virtualHost)
       throws IOException, InstantiationException, IllegalAccessException, InvocationTargetException,
-          NoSuchMethodException {
+          NoSuchMethodException, TimeoutException, InterruptedException {
+    String pluginId = getFinalName(clazz, name);
+    final Registration registration = new Registration();
+    final ManagerCredentials managerCredentials =
+        registration.registerPluginToNfvo(
+            brokerIp, port, username, password, virtualHost, pluginId);
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread() {
+              @Override
+              public void run() {
+                try {
+                  registration.deregisterPluginFromNfvo(
+                      brokerIp,
+                      port,
+                      username,
+                      password,
+                      virtualHost,
+                      managerCredentials.getRabbitUsername(),
+                      managerCredentials.getRabbitPassword());
+                } catch (IOException e) {
+                  e.printStackTrace();
+                } catch (TimeoutException e) {
+                  e.printStackTrace();
+                }
+              }
+            });
+    // registration.registerPluginToNfvo(factory, pluginId);
     if (properties == null) getProperties(clazz);
     executor = Executors.newFixedThreadPool(consumers);
     for (int i = 0; i < consumers; i++) {
       PluginListener pluginListener = new PluginListener();
-      pluginListener.setPluginId(getFinalName(clazz, name));
+      pluginListener.setPluginId(pluginId);
       pluginListener.setPluginInstance(clazz.getConstructor().newInstance());
       pluginListener.setBrokerIp(brokerIp);
       pluginListener.setBrokerPort(port);
-      pluginListener.setUsername(username);
-      pluginListener.setPassword(password);
+      pluginListener.setUsername(managerCredentials.getRabbitUsername());
+      pluginListener.setPassword(managerCredentials.getRabbitPassword());
+      pluginListener.setVirtualHost(virtualHost);
 
       executor.execute(pluginListener);
     }
