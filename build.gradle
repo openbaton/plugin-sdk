@@ -60,7 +60,7 @@ project.ext {
      */
     //------------------------------------------------//
     mainClass = 'org.openbaton.plugin.main.spring.SpringPlugin'
-    openbatonVersion = "4.0.0"
+    openbatonVersion = "4.0.1-SNAPSHOT"
 }
 
 
