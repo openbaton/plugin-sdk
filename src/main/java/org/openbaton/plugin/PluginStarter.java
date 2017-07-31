@@ -15,7 +15,6 @@
 
 package org.openbaton.plugin;
 
-import com.rabbitmq.client.ConnectionFactory;
 import org.openbaton.catalogue.nfvo.ManagerCredentials;
 import org.openbaton.plugin.utils.Utils;
 import org.openbaton.registration.Registration;
@@ -29,7 +28,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -63,8 +61,8 @@ public class PluginStarter {
       throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
           InstantiationException, TimeoutException, InterruptedException {
     getProperties(clazz);
-    String username = properties.getProperty("username", "guest");
-    String password = properties.getProperty("password", "guest");
+    String username = properties.getProperty("username", "openbaton-manager-user");
+    String password = properties.getProperty("password", "openbaton");
     String virtualHost = properties.getProperty("virtual-host", "/");
     registerPlugin(clazz, name, brokerIp, port, consumers, username, password, virtualHost);
   }
