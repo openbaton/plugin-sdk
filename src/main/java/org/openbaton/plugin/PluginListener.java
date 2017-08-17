@@ -1,6 +1,16 @@
 package org.openbaton.plugin;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
 import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -10,7 +20,6 @@ import com.rabbitmq.client.QueueingConsumer;
 import org.apache.commons.codec.binary.Base64;
 import org.openbaton.catalogue.nfvo.PluginAnswer;
 import org.openbaton.exceptions.NotFoundException;
-import org.openbaton.registration.Registration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +56,16 @@ public class PluginListener implements Runnable {
   private String password;
   private String virtualHost;
   private Connection connection;
+
+  public boolean isDurable() {
+    return durable;
+  }
+
+  public void setDurable(boolean durable) {
+    this.durable = durable;
+  }
+
+  private boolean durable = true;
 
   public String getPluginId() {
     return pluginId;
@@ -252,7 +271,7 @@ public class PluginListener implements Runnable {
     connection = factory.newConnection();
     channel = connection.createChannel();
 
-    channel.queueDeclare(pluginId, false, false, true, null);
+    channel.queueDeclare(pluginId, this.durable, false, true, null);
     channel.queueBind(pluginId, exchange, pluginId);
 
     channel.basicQos(1);

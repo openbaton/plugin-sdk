@@ -44,10 +44,12 @@ public class PluginStarter {
     getProperties(clazz);
     String inte = Utils.checkInterface(clazz);
     if (inte.equals("unknown-interface")) // no interface found
-    throw new RuntimeException(
+    {
+      throw new RuntimeException(
           "The plugin class "
               + clazz.getSimpleName()
               + " needs to extend or VimDriver or Monitoring classes");
+    }
     return inte + "." + properties.getProperty("type", "unknown") + "." + name;
   }
 
@@ -60,11 +62,19 @@ public class PluginStarter {
       Class clazz, String name, String brokerIp, int port, int consumers)
       throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
           InstantiationException, TimeoutException, InterruptedException {
+    registerPlugin(clazz, name, brokerIp, port, consumers, true);
+  }
+
+  public static void registerPlugin(
+      Class clazz, String name, String brokerIp, int port, int consumers, boolean durable)
+      throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
+          InstantiationException, TimeoutException, InterruptedException {
     getProperties(clazz);
     String username = properties.getProperty("username", "openbaton-manager-user");
     String password = properties.getProperty("password", "openbaton");
     String virtualHost = properties.getProperty("virtual-host", "/");
-    registerPlugin(clazz, name, brokerIp, port, consumers, username, password, virtualHost);
+    registerPlugin(
+        clazz, name, brokerIp, port, consumers, username, password, virtualHost, durable);
   }
 
   protected static void registerPlugin(
@@ -75,7 +85,8 @@ public class PluginStarter {
       int consumers,
       final String username,
       final String password,
-      final String virtualHost)
+      final String virtualHost,
+      boolean queueDurable)
       throws IOException, InstantiationException, IllegalAccessException, InvocationTargetException,
           NoSuchMethodException, TimeoutException, InterruptedException {
     String pluginId = getFinalName(clazz, name);
@@ -105,10 +116,13 @@ public class PluginStarter {
               }
             });
     // registration.registerPluginToNfvo(factory, pluginId);
-    if (properties == null) getProperties(clazz);
+    if (properties == null) {
+      getProperties(clazz);
+    }
     executor = Executors.newFixedThreadPool(consumers);
     for (int i = 0; i < consumers; i++) {
       PluginListener pluginListener = new PluginListener();
+      pluginListener.setDurable(queueDurable);
       pluginListener.setPluginId(pluginId);
       pluginListener.setPluginInstance(clazz.getConstructor().newInstance());
       pluginListener.setBrokerIp(brokerIp);
