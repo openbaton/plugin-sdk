@@ -32,14 +32,15 @@ project.ext{
 apply plugin: 'java'
 apply plugin: 'maven'
 repositories {
+    mavenLocal()
     mavenCentral()
     maven {
-        url "http://193.175.132.176:8081/nexus/content/groups/public"
+	url 'https://oss.sonatype.org/content/repositories/snapshots/'
     }
 }
 
 dependencies {
-    compile 'org.openbaton:plugin-sdk:2.0.0'
+    compile 'org.openbaton:plugin-sdk:4.0.0'
 }
 ```
 
