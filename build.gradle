@@ -60,12 +60,12 @@ project.ext {
      */
     //------------------------------------------------//
     mainClass = 'org.openbaton.plugin.main.spring.SpringPlugin'
-    openbatonVersion = "4.0.1-SNAPSHOT"
+    openbatonVersion = "5.0.0-RC1"
 }
 
 
-sourceCompatibility = 1.7
-targetCompatibility = 1.7
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 allprojects {
 
@@ -132,6 +132,9 @@ repositories {
     maven {
         url "https://oss.sonatype.org/content/repositories/snapshots/"
     }
+    maven {
+        url 'https://oss.sonatype.org/content/repositories/releases/'
+    }
 }
 
 release {
@@ -148,6 +151,11 @@ release {
     tagTemplate = '${version}'
     versionPropertyFile = 'gradle.properties'
     versionProperties = []
+    git {
+        requireBranch = ''
+//        pushToRemote = 'origin'
+//        pushToCurrentBranch = false
+    }
 }
 
 
