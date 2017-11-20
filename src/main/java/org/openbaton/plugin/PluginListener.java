@@ -159,7 +159,7 @@ public class PluginListener implements Runnable {
         try {
           response = gson.toJson(answer);
 
-          log.debug("Answer is: " + response);
+          log.trace("Answer is: " + response);
           log.debug("Reply queue is: " + props.getReplyTo());
 
           channel.basicPublish(exchange, props.getReplyTo(), replyProps, response.getBytes());
