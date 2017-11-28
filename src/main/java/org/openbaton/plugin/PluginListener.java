@@ -19,7 +19,10 @@ import com.rabbitmq.client.QueueingConsumer;
 
 import org.apache.commons.codec.binary.Base64;
 import org.openbaton.catalogue.nfvo.PluginAnswer;
+import org.openbaton.catalogue.nfvo.viminstances.BaseVimInstance;
 import org.openbaton.exceptions.NotFoundException;
+import org.openbaton.nfvo.common.configuration.NfvoGsonDeserializerVimInstance;
+import org.openbaton.nfvo.common.configuration.NfvoGsonSerializerVimInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +50,8 @@ public class PluginListener implements Runnable {
   private Gson gson =
       new GsonBuilder()
           .registerTypeHierarchyAdapter(byte[].class, new ByteArrayToBase64TypeAdapter())
+          .registerTypeAdapter(BaseVimInstance.class, new NfvoGsonDeserializerVimInstance())
+          .registerTypeAdapter(BaseVimInstance.class, new NfvoGsonSerializerVimInstance())
           .setPrettyPrinting()
           .create();
   private boolean exit = false;
@@ -154,7 +159,7 @@ public class PluginListener implements Runnable {
         try {
           response = gson.toJson(answer);
 
-          log.debug("Answer is: " + response);
+          log.trace("Answer is: " + response);
           log.debug("Reply queue is: " + props.getReplyTo());
 
           channel.basicPublish(exchange, props.getReplyTo(), replyProps, response.getBytes());
@@ -191,7 +196,7 @@ public class PluginListener implements Runnable {
 
     JsonObject pluginMessageObject = gson.fromJson(pluginMessageString, JsonObject.class);
 
-    List<Object> params = new ArrayList<Object>();
+    List<Object> params = new ArrayList<>();
 
     for (JsonElement param : pluginMessageObject.get("parameters").getAsJsonArray()) {
       Object p = gson.fromJson(param, Object.class);
