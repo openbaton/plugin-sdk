@@ -19,8 +19,12 @@ import com.rabbitmq.client.QueueingConsumer;
 
 import org.apache.commons.codec.binary.Base64;
 import org.openbaton.catalogue.nfvo.PluginAnswer;
+import org.openbaton.catalogue.nfvo.images.BaseNfvImage;
+import org.openbaton.catalogue.nfvo.networks.BaseNetwork;
 import org.openbaton.catalogue.nfvo.viminstances.BaseVimInstance;
 import org.openbaton.exceptions.NotFoundException;
+import org.openbaton.nfvo.common.configuration.NfvoGsonDeserializerImage;
+import org.openbaton.nfvo.common.configuration.NfvoGsonDeserializerNetwork;
 import org.openbaton.nfvo.common.configuration.NfvoGsonDeserializerVimInstance;
 import org.openbaton.nfvo.common.configuration.NfvoGsonSerializerVimInstance;
 import org.slf4j.Logger;
@@ -51,6 +55,8 @@ public class PluginListener implements Runnable {
       new GsonBuilder()
           .registerTypeHierarchyAdapter(byte[].class, new ByteArrayToBase64TypeAdapter())
           .registerTypeAdapter(BaseVimInstance.class, new NfvoGsonDeserializerVimInstance())
+          .registerTypeAdapter(BaseNetwork.class, new NfvoGsonDeserializerNetwork())
+          .registerTypeAdapter(BaseNfvImage.class, new NfvoGsonDeserializerImage())
           .registerTypeAdapter(BaseVimInstance.class, new NfvoGsonSerializerVimInstance())
           .setPrettyPrinting()
           .create();
