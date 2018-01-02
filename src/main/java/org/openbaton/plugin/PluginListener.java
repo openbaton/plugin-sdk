@@ -11,10 +11,14 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Consumer;
+import com.rabbitmq.client.DefaultConsumer;
+import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.QueueingConsumer;
 
 import org.apache.commons.codec.binary.Base64;
@@ -49,7 +53,6 @@ public class PluginListener implements Runnable {
   private String pluginId;
   private Object pluginInstance;
   private Logger log;
-  private QueueingConsumer consumer;
   private Channel channel;
   private Gson gson =
       new GsonBuilder()
@@ -126,66 +129,80 @@ public class PluginListener implements Runnable {
     }
     try {
 
-      while (!exit) {
-        QueueingConsumer.Delivery delivery;
-        BasicProperties props;
-        BasicProperties replyProps;
-        try {
-          delivery = consumer.nextDelivery();
+      Consumer consumer =
+          new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(
+                String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body)
+                throws IOException {
+              AMQP.BasicProperties props =
+                  new AMQP.BasicProperties.Builder()
+                      .correlationId(properties.getCorrelationId())
+                      .build();
 
-          props = delivery.getProperties();
-          replyProps =
-              new BasicProperties.Builder()
-                  .correlationId(props.getCorrelationId())
-                  //                        .contentType("plain/text")
-                  .build();
-        } catch (Exception e) {
-          e.printStackTrace();
-          exit = true;
-          continue;
-        }
-        log.info("\nWaiting for RPC requests");
-        String message = new String(delivery.getBody());
+              String message = new String(body, "UTF-8");
+              log.debug("Received message");
+              log.trace("Message content received: " + message);
 
-        log.debug("Received message");
-        log.trace("Message content received: " + message);
+              PluginAnswer answer = new PluginAnswer();
 
-        PluginAnswer answer = new PluginAnswer();
+              try {
+                answer.setAnswer(executeMethod(message));
+              } catch (InvocationTargetException e) {
+                answer.setException(e.getTargetException());
+              } catch (Exception e) {
+                e.printStackTrace();
+                answer.setException(e);
+              }
 
-        try {
-          answer.setAnswer(executeMethod(message));
-        } catch (InvocationTargetException e) {
-          answer.setException(e.getTargetException());
-        } catch (Exception e) {
-          e.printStackTrace();
-          answer.setException(e);
-        }
+              String response;
+              try {
+                response = gson.toJson(answer);
 
-        String response;
-        try {
-          response = gson.toJson(answer);
+                log.trace("Answer is: " + response);
+                log.debug("Reply queue is: " + properties.getReplyTo());
 
-          log.trace("Answer is: " + response);
-          log.debug("Reply queue is: " + props.getReplyTo());
+                channel.basicPublish(exchange, properties.getReplyTo(), props, response.getBytes());
 
-          channel.basicPublish(exchange, props.getReplyTo(), replyProps, response.getBytes());
+                channel.basicAck(envelope.getDeliveryTag(), false);
+              } catch (Exception e) {
+                e.printStackTrace();
+                answer.setException(e);
+                log.debug("Answer is: " + answer);
+                log.debug("Reply queue is: " + properties.getReplyTo());
 
-          channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-        } catch (Exception e) {
-          e.printStackTrace();
-          answer.setException(e);
-          log.debug("Answer is: " + answer);
-          log.debug("Reply queue is: " + props.getReplyTo());
+                channel.basicPublish(
+                    exchange, properties.getReplyTo(), props, gson.toJson(answer).getBytes());
 
-          channel.basicPublish(
-              exchange, props.getReplyTo(), replyProps, gson.toJson(answer).getBytes());
+                channel.basicAck(envelope.getDeliveryTag(), false);
+                setExit(true);
+              }
+              synchronized (this) {
+                this.notify();
+              }
+            }
+          };
 
-          channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
-          setExit(true);
+      channel.basicConsume(pluginId, false, consumer);
+
+      // Wait and be prepared to consume the message from RPC client.
+      while (true) {
+        synchronized (consumer) {
+          try {
+            consumer.wait();
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
         }
       }
     } catch (IOException e) {
       e.printStackTrace();
+    } finally {
+      if (connection != null)
+        try {
+          connection.close();
+        } catch (IOException ignored) {
+        }
     }
 
     try {
@@ -264,7 +281,7 @@ public class PluginListener implements Runnable {
   }
 
   private List<Object> getParameters(JsonArray parameters, Class<?>[] parameterTypes) {
-    List<Object> res = new LinkedList<Object>();
+    List<Object> res = new LinkedList<>();
     for (int i = 0; i < parameters.size(); i++) {
       res.add(gson.fromJson(parameters.get(i), parameterTypes[i]));
     }
@@ -286,9 +303,6 @@ public class PluginListener implements Runnable {
     channel.queueBind(pluginId, exchange, pluginId);
 
     channel.basicQos(1);
-
-    consumer = new QueueingConsumer(channel);
-    channel.basicConsume(pluginId, false, consumer);
   }
 
   public String getBrokerIp() {

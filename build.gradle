@@ -39,28 +39,12 @@ apply plugin: 'maven'
  * Project settings
  */
 project.ext {
-    //------------------------------------------------//
-    /**
-     * Spring Related Variables
-     */
-    springVersion = '4.2.0.RELEASE'
-    springBootVersion = '1.2.5.RELEASE'
-    //------------------------------------------------//
-    //------------------------------------------------//
     /**
      * Application Related Version
      */
     applicationVersion = version
     applicationVersionDebian = "1";
-
-    //------------------------------------------------//
-    //------------------------------------------------//
-    /**
-     * gradle Related Vars
-     */
-    //------------------------------------------------//
-    mainClass = 'org.openbaton.plugin.main.spring.SpringPlugin'
-    openbatonVersion = "5.1.2"
+    openbatonVersion = "5.1.4-SNAPSHOT"
 }
 
 
@@ -81,7 +65,10 @@ allprojects {
         mavenLocal()
         mavenCentral()
         maven {
-                url "https://oss.sonatype.org/content/repositories/snapshots/"
+            url "https://oss.sonatype.org/content/repositories/snapshots/"
+        }
+
+        maven {
                 url "https://oss.sonatype.org/content/repositories/releases/"
         }
     }
