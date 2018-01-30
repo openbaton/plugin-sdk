@@ -12,15 +12,12 @@ import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
-import com.rabbitmq.client.QueueingConsumer;
-
 import org.apache.commons.codec.binary.Base64;
 import org.openbaton.catalogue.nfvo.PluginAnswer;
 import org.openbaton.catalogue.nfvo.images.BaseNfvImage;
@@ -36,17 +33,16 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeoutException;
 
-/**
- * Created by lto on 25/11/15.
- */
 public class PluginListener implements Runnable {
 
   private static final String exchange = "openbaton-exchange";
@@ -63,17 +59,13 @@ public class PluginListener implements Runnable {
           .registerTypeAdapter(BaseVimInstance.class, new NfvoGsonSerializerVimInstance())
           .setPrettyPrinting()
           .create();
-  private boolean exit = false;
   private String brokerIp;
   private int brokerPort;
   private String username;
   private String password;
   private String virtualHost;
   private Connection connection;
-
-  public boolean isDurable() {
-    return durable;
-  }
+  private ThreadPoolExecutor executor;
 
   public void setDurable(boolean durable) {
     this.durable = durable;
@@ -81,16 +73,8 @@ public class PluginListener implements Runnable {
 
   private boolean durable = true;
 
-  public String getPluginId() {
-    return pluginId;
-  }
-
   public void setPluginId(String pluginId) {
     this.pluginId = pluginId;
-  }
-
-  public Object getPluginInstance() {
-    return pluginInstance;
   }
 
   public void setPluginInstance(Object pluginInstance) {
@@ -98,12 +82,12 @@ public class PluginListener implements Runnable {
     log = LoggerFactory.getLogger(pluginInstance.getClass().getName());
   }
 
-  public boolean isExit() {
-    return exit;
+  public void setExecutor(ThreadPoolExecutor executor) {
+    this.executor = executor;
   }
 
-  public void setExit(boolean exit) {
-    this.exit = exit;
+  public ThreadPoolExecutor getExecutor() {
+    return executor;
   }
 
   private static class ByteArrayToBase64TypeAdapter
@@ -125,7 +109,7 @@ public class PluginListener implements Runnable {
       initRabbitMQ();
     } catch (IOException | TimeoutException e) {
       e.printStackTrace();
-      setExit(true);
+      return;
     }
     try {
 
@@ -140,43 +124,64 @@ public class PluginListener implements Runnable {
                       .correlationId(properties.getCorrelationId())
                       .build();
 
-              String message = new String(body, "UTF-8");
-              log.debug("Received message");
-              log.trace("Message content received: " + message);
+              executor.execute(
+                  () -> {
+                    String message;
+                    try {
+                      message = new String(body, "UTF-8");
+                    } catch (UnsupportedEncodingException e) {
+                      e.printStackTrace();
+                      return;
+                    }
+                    log.debug("Received message");
+                    log.trace("Message content received: " + message);
 
-              PluginAnswer answer = new PluginAnswer();
+                    PluginAnswer answer = new PluginAnswer();
 
-              try {
-                answer.setAnswer(executeMethod(message));
-              } catch (InvocationTargetException e) {
-                answer.setException(e.getTargetException());
-              } catch (Exception e) {
-                e.printStackTrace();
-                answer.setException(e);
-              }
+                    try {
+                      answer.setAnswer(executeMethod(message));
+                    } catch (InvocationTargetException e) {
+                      answer.setException(e.getTargetException());
+                    } catch (Exception e) {
+                      e.printStackTrace();
+                      answer.setException(e);
+                    }
 
-              String response;
-              try {
-                response = gson.toJson(answer);
+                    String response;
+                    try {
+                      response = gson.toJson(answer);
 
-                log.trace("Answer is: " + response);
-                log.debug("Reply queue is: " + properties.getReplyTo());
+                      log.trace("Answer is: " + response);
+                      log.debug("Reply queue is: " + properties.getReplyTo());
 
-                channel.basicPublish(exchange, properties.getReplyTo(), props, response.getBytes());
+                      channel.basicPublish(
+                          exchange, properties.getReplyTo(), props, response.getBytes());
 
-                channel.basicAck(envelope.getDeliveryTag(), false);
-              } catch (Exception e) {
-                e.printStackTrace();
-                answer.setException(e);
-                log.debug("Answer is: " + answer);
-                log.debug("Reply queue is: " + properties.getReplyTo());
+                      channel.basicAck(envelope.getDeliveryTag(), false);
+                    } catch (Throwable e) {
+                      e.printStackTrace();
+                      answer.setException(e);
+                      log.debug("Answer is: " + answer);
+                      log.debug("Reply queue is: " + properties.getReplyTo());
+                      try {
+                        channel.basicPublish(
+                            exchange,
+                            properties.getReplyTo(),
+                            props,
+                            gson.toJson(answer).getBytes());
 
-                channel.basicPublish(
-                    exchange, properties.getReplyTo(), props, gson.toJson(answer).getBytes());
+                        channel.basicAck(envelope.getDeliveryTag(), false);
+                      } catch (IOException ex) {
+                        log.error(
+                            String.format(
+                                "Thread %s got an exception: %s",
+                                Thread.currentThread().getName(),
+                                e.getMessage()));
+                        e.printStackTrace();
+                      }
+                    }
+                  });
 
-                channel.basicAck(envelope.getDeliveryTag(), false);
-                setExit(true);
-              }
               synchronized (this) {
                 this.notify();
               }
@@ -305,40 +310,20 @@ public class PluginListener implements Runnable {
     channel.basicQos(1);
   }
 
-  public String getBrokerIp() {
-    return brokerIp;
-  }
-
   public void setBrokerIp(String brokerIp) {
     this.brokerIp = brokerIp;
-  }
-
-  public int getBrokerPort() {
-    return brokerPort;
   }
 
   public void setBrokerPort(int brokerPort) {
     this.brokerPort = brokerPort;
   }
 
-  public String getUsername() {
-    return username;
-  }
-
   public void setUsername(String username) {
     this.username = username;
   }
 
-  public String getPassword() {
-    return password;
-  }
-
   public void setPassword(String password) {
     this.password = password;
-  }
-
-  public String getVirtualHost() {
-    return this.virtualHost;
   }
 
   public void setVirtualHost(String virtualHost) {

@@ -51,53 +51,6 @@ project.ext {
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
-allprojects {
-
-    apply plugin: 'java'
-    apply plugin: 'maven'
-
-    group = 'org.openbaton'
-
-    sourceCompatibility = 1.7
-    targetCompatibility = 1.7
-
-    repositories {
-        mavenLocal()
-        mavenCentral()
-        maven {
-            url "https://oss.sonatype.org/content/repositories/snapshots/"
-        }
-
-        maven {
-                url "https://oss.sonatype.org/content/repositories/releases/"
-        }
-    }
-    sourceSets {
-        main {
-            java      { srcDir 'src/main/java'}
-            resources { srcDir 'src/main/resources'}
-        }
-
-        test {
-            java      { srcDir 'src/test/java'}
-            resources { srcDir 'src/test/resources'}
-        }
-
-        integration {
-            java      { srcDir 'src/test/integration/java' }
-            resources { srcDir 'src/test/resources'}
-            compileClasspath += sourceSets.test.compileClasspath
-            runtimeClasspath += sourceSets.test.runtimeClasspath
-            output.classesDir = sourceSets.test.output.classesDir
-        }
-
-    }
-
-    dependencies {
-        integrationCompile sourceSets.test.output
-    }
-}
-
 dependencies {
     compile 'org.openbaton:vim-drivers:' + openbatonVersion
     compile 'org.openbaton:monitoring:' + openbatonVersion
@@ -107,10 +60,13 @@ dependencies {
     compile 'com.google.code.gson:gson:2.5'
     compile 'org.slf4j:slf4j-api:1.7.12'
     compile 'com.rabbitmq:amqp-client:3.5.6'
-
-    integrationCompile sourceSets.test.output
 }
 
+gradle.projectsEvaluated {
+    tasks.withType(JavaCompile) {
+        options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+    }
+}
 
 repositories {
     mavenLocal()
@@ -140,8 +96,6 @@ release {
     versionProperties = []
     git {
         requireBranch = ''
-//        pushToRemote = 'origin'
-//        pushToCurrentBranch = false
     }
 }
 

@@ -18,27 +18,22 @@ package org.openbaton.plugin;
 import org.openbaton.catalogue.nfvo.ManagerCredentials;
 import org.openbaton.plugin.utils.Utils;
 import org.openbaton.registration.Registration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-/**
- * Created by lto on 09/09/15.
- */
 public class PluginStarter {
 
-  protected static final Logger log = LoggerFactory.getLogger(PluginStarter.class);
-  private static Map<String, PluginListener> plugins = new HashMap<String, PluginListener>();
   private static Properties properties;
-  private static ExecutorService executor;
+  private static ThreadPoolExecutor executor;
 
   private static String getFinalName(Class clazz, String name) throws IOException {
     getProperties(clazz);
@@ -65,11 +60,18 @@ public class PluginStarter {
     registerPlugin(clazz, name, brokerIp, port, consumers, true);
   }
 
-  public static void registerPlugin(
+  private static void registerPlugin(
       Class clazz, String name, String brokerIp, int port, int consumers, boolean durable)
       throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
           InstantiationException, TimeoutException, InterruptedException {
     getProperties(clazz);
+    executor =
+        new ThreadPoolExecutor(
+            consumers,
+            Integer.MAX_VALUE,
+            Long.parseLong(properties.getProperty("keep-alive", "120000")),
+            TimeUnit.MILLISECONDS,
+            new SynchronousQueue<>());
     String username = properties.getProperty("username", "openbaton-manager-user");
     String password = properties.getProperty("password", "openbaton");
     String virtualHost = properties.getProperty("virtual-host", "/");
@@ -77,7 +79,8 @@ public class PluginStarter {
         clazz, name, brokerIp, port, consumers, username, password, virtualHost, durable);
   }
 
-  protected static void registerPlugin(
+  @SuppressWarnings("unchecked")
+  private static void registerPlugin(
       Class clazz,
       String name,
       final String brokerIp,
@@ -96,32 +99,29 @@ public class PluginStarter {
             brokerIp, port, username, password, virtualHost, pluginId);
     Runtime.getRuntime()
         .addShutdownHook(
-            new Thread() {
-              @Override
-              public void run() {
-                try {
-                  registration.deregisterPluginFromNfvo(
-                      brokerIp,
-                      port,
-                      username,
-                      password,
-                      virtualHost,
-                      managerCredentials.getRabbitUsername(),
-                      managerCredentials.getRabbitPassword());
-                } catch (IOException e) {
-                  e.printStackTrace();
-                } catch (TimeoutException e) {
-                  e.printStackTrace();
-                }
-              }
-            });
-    // registration.registerPluginToNfvo(factory, pluginId);
+            new Thread(
+                () -> {
+                  try {
+                    registration.deregisterPluginFromNfvo(
+                        brokerIp,
+                        port,
+                        username,
+                        password,
+                        virtualHost,
+                        managerCredentials.getRabbitUsername(),
+                        managerCredentials.getRabbitPassword());
+                    executor.shutdown();
+                  } catch (IOException | TimeoutException e) {
+                    e.printStackTrace();
+                  }
+                }));
     if (properties == null) {
       getProperties(clazz);
     }
-    executor = Executors.newFixedThreadPool(consumers);
+    ExecutorService executor = Executors.newFixedThreadPool(consumers);
     for (int i = 0; i < consumers; i++) {
       PluginListener pluginListener = new PluginListener();
+      pluginListener.setExecutor(PluginStarter.executor);
       pluginListener.setDurable(queueDurable);
       pluginListener.setPluginId(pluginId);
       pluginListener.setPluginInstance(clazz.getConstructor().newInstance());
