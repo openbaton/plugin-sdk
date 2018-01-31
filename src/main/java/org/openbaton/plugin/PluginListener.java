@@ -133,7 +133,7 @@ public class PluginListener implements Runnable {
                       e.printStackTrace();
                       return;
                     }
-                    log.debug("Received message");
+                    log.trace("Received message");
                     log.trace("Message content received: " + message);
 
                     PluginAnswer answer = new PluginAnswer();
@@ -152,17 +152,16 @@ public class PluginListener implements Runnable {
                       response = gson.toJson(answer);
 
                       log.trace("Answer is: " + response);
-                      log.debug("Reply queue is: " + properties.getReplyTo());
+                      log.trace("Reply queue is: " + properties.getReplyTo());
 
                       channel.basicPublish(
                           exchange, properties.getReplyTo(), props, response.getBytes());
 
-                      channel.basicAck(envelope.getDeliveryTag(), false);
                     } catch (Throwable e) {
                       e.printStackTrace();
                       answer.setException(e);
-                      log.debug("Answer is: " + answer);
-                      log.debug("Reply queue is: " + properties.getReplyTo());
+                      log.trace("Answer is: " + answer);
+                      log.trace("Reply queue is: " + properties.getReplyTo());
                       try {
                         channel.basicPublish(
                             exchange,
@@ -170,7 +169,6 @@ public class PluginListener implements Runnable {
                             props,
                             gson.toJson(answer).getBytes());
 
-                        channel.basicAck(envelope.getDeliveryTag(), false);
                       } catch (IOException ex) {
                         log.error(
                             String.format(
@@ -181,6 +179,9 @@ public class PluginListener implements Runnable {
                       }
                     }
                   });
+
+              channel.basicAck(envelope.getDeliveryTag(), false);
+              log.trace(String.format("Ack %d", envelope.getDeliveryTag()));
 
               synchronized (this) {
                 this.notify();
@@ -196,7 +197,8 @@ public class PluginListener implements Runnable {
           try {
             consumer.wait();
           } catch (InterruptedException e) {
-            e.printStackTrace();
+            log.info("Ctrl-c received");
+            System.exit(0);
           }
         }
       }
@@ -235,9 +237,9 @@ public class PluginListener implements Runnable {
 
     Class pluginClass = pluginInstance.getClass();
 
-    log.debug("There are " + params.size() + " parameters");
+    log.trace("There are " + params.size() + " parameters");
     String methodName = pluginMessageObject.get("methodName").getAsString();
-    log.debug("Looking for method: " + methodName);
+    log.trace("Looking for method: " + methodName);
 
     for (Method m : pluginClass.getMethods()) {
       log.trace(
