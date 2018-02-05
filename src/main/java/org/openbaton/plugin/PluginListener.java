@@ -141,6 +141,7 @@ public class PluginListener implements Runnable {
                     try {
                       answer.setAnswer(executeMethod(message));
                     } catch (InvocationTargetException e) {
+                      e.getTargetException().printStackTrace();
                       answer.setException(e.getTargetException());
                     } catch (Exception e) {
                       e.printStackTrace();
