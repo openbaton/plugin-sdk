@@ -53,7 +53,7 @@ public class PluginStarter {
     System.getenv()
         .forEach(
             (k, v) -> {
-              String kNew = k.replace("_","-");
+              String kNew = k.replace("_", "-");
               if (properties.containsKey(kNew.toLowerCase())) properties.put(kNew.toLowerCase(), v);
             });
   }
