@@ -24,7 +24,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -51,17 +50,15 @@ public class PluginStarter {
   private static void getProperties(Class clazz) throws IOException {
     properties = new Properties();
     properties.load(clazz.getResourceAsStream("/plugin.conf.properties"));
+    System.getenv()
+        .forEach(
+            (k, v) -> {
+              if (properties.containsKey(k.toLowerCase())) properties.put(k.toLowerCase(), v);
+            });
   }
 
   public static void registerPlugin(
       Class clazz, String name, String brokerIp, int port, int consumers)
-      throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
-          InstantiationException, TimeoutException, InterruptedException {
-    registerPlugin(clazz, name, brokerIp, port, consumers, true);
-  }
-
-  private static void registerPlugin(
-      Class clazz, String name, String brokerIp, int port, int consumers, boolean durable)
       throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
           InstantiationException, TimeoutException, InterruptedException {
     getProperties(clazz);
@@ -75,8 +72,7 @@ public class PluginStarter {
     String username = properties.getProperty("username", "openbaton-manager-user");
     String password = properties.getProperty("password", "openbaton");
     String virtualHost = properties.getProperty("virtual-host", "/");
-    registerPlugin(
-        clazz, name, brokerIp, port, consumers, username, password, virtualHost, durable);
+    registerPlugin(clazz, name, brokerIp, port, consumers, username, password, virtualHost);
   }
 
   @SuppressWarnings("unchecked")
@@ -88,8 +84,7 @@ public class PluginStarter {
       int consumers,
       final String username,
       final String password,
-      final String virtualHost,
-      boolean queueDurable)
+      final String virtualHost)
       throws IOException, InstantiationException, IllegalAccessException, InvocationTargetException,
           NoSuchMethodException, TimeoutException, InterruptedException {
     String pluginId = getFinalName(clazz, name);
@@ -122,7 +117,7 @@ public class PluginStarter {
     for (int i = 0; i < consumers; i++) {
       PluginListener pluginListener = new PluginListener();
       pluginListener.setExecutor(PluginStarter.executor);
-      pluginListener.setDurable(queueDurable);
+      pluginListener.setDurable(true);
       pluginListener.setPluginId(pluginId);
       pluginListener.setPluginInstance(clazz.getConstructor().newInstance());
       pluginListener.setBrokerIp(brokerIp);
