@@ -15,10 +15,6 @@
 
 package org.openbaton.plugin;
 
-import org.openbaton.catalogue.nfvo.ManagerCredentials;
-import org.openbaton.plugin.utils.Utils;
-import org.openbaton.registration.Registration;
-
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Properties;
@@ -28,6 +24,9 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.openbaton.catalogue.nfvo.ManagerCredentials;
+import org.openbaton.plugin.utils.Utils;
+import org.openbaton.registration.Registration;
 
 public class PluginStarter {
 
@@ -53,7 +52,7 @@ public class PluginStarter {
     System.getenv()
         .forEach(
             (k, v) -> {
-              String kNew = k.replace("_","-");
+              String kNew = k.replace("_", "-");
               if (properties.containsKey(kNew.toLowerCase())) properties.put(kNew.toLowerCase(), v);
             });
   }

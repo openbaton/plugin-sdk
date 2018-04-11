@@ -18,6 +18,17 @@ import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
+import java.io.IOException;
+import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.codec.binary.Base64;
 import org.openbaton.catalogue.nfvo.PluginAnswer;
 import org.openbaton.catalogue.nfvo.images.BaseNfvImage;
@@ -30,18 +41,6 @@ import org.openbaton.nfvo.common.configuration.NfvoGsonDeserializerVimInstance;
 import org.openbaton.nfvo.common.configuration.NfvoGsonSerializerVimInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeoutException;
 
 public class PluginListener implements Runnable {
 
@@ -174,8 +173,7 @@ public class PluginListener implements Runnable {
                         log.error(
                             String.format(
                                 "Thread %s got an exception: %s",
-                                Thread.currentThread().getName(),
-                                e.getMessage()));
+                                Thread.currentThread().getName(), e.getMessage()));
                         e.printStackTrace();
                       }
                     }
