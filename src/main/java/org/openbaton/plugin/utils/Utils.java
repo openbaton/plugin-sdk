@@ -3,9 +3,7 @@ package org.openbaton.plugin.utils;
 import org.openbaton.monitoring.interfaces.VirtualisedResourcesPerformanceManagement;
 import org.openbaton.vim.drivers.interfaces.ClientInterfaces;
 
-/**
- * Created by gca on 14/12/16.
- */
+/** Created by gca on 14/12/16. */
 public class Utils {
 
   public static String checkInterface(Class clazz) {
